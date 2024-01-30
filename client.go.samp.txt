@@ -1,0 +1,74 @@
+package main
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"net/rpc"
+	"os"
+	"time"
+)
+
+type CommandRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Command  string `json:"command"`
+}
+
+type CommandResponse struct {
+	Errno int         `json:"errno"`
+	Error string      `json:"error"`
+	Data  CommandData `json:"data"`
+}
+
+type CommandData struct {
+	Status      string            `json:"status"`
+	Stdout      string            `json:"stdout"`
+	ExitCode    int               `json:"exit_code"`
+	CreateTime  time.Time         `json:"create_time"`
+	FinishTime  time.Time         `json:"finish_time"`
+	Environment map[string]string `json:"environment"`
+}
+
+func main() {
+	client, err := rpc.Dial("tcp", "localhost:1234")
+	if err != nil {
+		fmt.Println("Error connecting to server:", err)
+		return
+	}
+	defer client.Close()
+
+	fmt.Print("Enter username: ")
+	var username string
+	fmt.Scanln(&username)
+
+	fmt.Print("Enter password: ")
+	var password string
+	fmt.Scanln(&password)
+
+	fmt.Print("Enter command: ")
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	command := scanner.Text()
+
+	request := CommandRequest{
+		Username: username,
+		Password: password,
+		Command:  command,
+	}
+
+	var response CommandResponse
+	err = client.Call("CommandService.ExecuteCommand", request, &response)
+	if err != nil {
+		fmt.Println("Error calling remote method:", err)
+		return
+	}
+
+	rawData, err := json.Marshal(response)
+	if err != nil {
+		fmt.Println("Error marshaling JSON:", err)
+		return
+	}
+
+	fmt.Println(string(rawData))
+}
